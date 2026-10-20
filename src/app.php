@@ -46,7 +46,10 @@ function valor(string $sql, array $p = []) { $r = q($sql, $p)->fetchColumn(); re
 
 function conf(string $chave, string $padrao = ''): string {
     static $cache = null;
-    if ($cache === null) { $cache = []; foreach (linhas('SELECT chave, valor FROM configuracoes') as $r) $cache[$r['chave']] = (string)$r['valor']; }
+    if ($cache === null) {
+        $cache = [];
+        try { foreach (linhas('SELECT chave, valor FROM configuracoes') as $r) $cache[$r['chave']] = (string)$r['valor']; } catch (PDOException $e) { /* banco ainda não instalado */ }
+    }
     return $cache[$chave] ?? $padrao;
 }
 function conf_set(string $chave, string $valor): void {

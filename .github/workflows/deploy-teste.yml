@@ -1,0 +1,24 @@
+# Publica automaticamente no ambiente de TESTE (subdomínio da Hostinger) a cada push nesta branch.
+name: Deploy ambiente de teste
+on:
+  push:
+    branches: [claude/condominio-management-app-kvd4j1]
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            config.php
+            storage/uploads/**
+            tools/**
+            README.md

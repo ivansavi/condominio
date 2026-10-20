@@ -22,6 +22,7 @@ if (eh_post()) {
         q("INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?,?,?,'gestao')", [$nome, $email, password_hash($s, PASSWORD_DEFAULT)]);
         conf_set('condominio_nome', post('condominio'));
         conf_set('multa_pct', '2'); conf_set('juros_mensal_pct', '1'); conf_set('dia_vencimento', '10');
+        if (post('demo')) { require __DIR__ . '/src/demo.php'; carregar_demo(); }
         $pronto = true;
     }
 }
@@ -41,6 +42,7 @@ pagina_inicio('Instalação');
     <label>Seu nome<input name="nome" required></label>
     <label>Seu e-mail (login)<input type="email" name="email" required></label>
     <label>Senha (mínimo 8 caracteres)<input type="password" name="senha" minlength="8" autocomplete="new-password" required></label>
+    <label class="check"><input type="checkbox" name="demo" value="1"> Carregar dados de demonstração (use só em ambiente de teste)</label>
     <button class="btn btn-grande">Instalar</button>
   </form>
 <?php endif; ?>

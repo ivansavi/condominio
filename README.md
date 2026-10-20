@@ -33,3 +33,9 @@ Ative o SSL grátis no hPanel; o `.htaccess` força HTTPS e bloqueia `config.php
 - Recuperação de senha por e-mail usa `mail()` do PHP (funciona na Hostinger com e-mail do domínio). Se não chegar, síndico/gestão gera nova senha provisória no cadastro do morador.
 - Uploads (PDF/JPG/PNG até 5 MB) ficam em `storage/uploads`, fora de acesso direto, e só são servidos a quem tem permissão.
 - Segurança: senhas com `password_hash`, CSRF em todos os formulários, consultas preparadas, bloqueio após 5 tentativas de login em 15 min.
+
+## Ambiente de teste (staging)
+Use um **subdomínio** da Hostinger (ex.: `teste.seudominio.com.br`) com um **banco MySQL separado** do de produção.
+1. Crie o subdomínio e um banco novo no hPanel; faça o passo a passo de instalação acima nele.
+2. Na tela do `instalar.php`, marque **"Carregar dados de demonstração"**. Logins (senha `demo1234`): `gestao@demo.com`, `sindico@demo.com`, `condomino@demo.com`.
+3. **Atualização automática**: o workflow `.github/workflows/deploy-teste.yml` envia por FTP o código a cada push na branch. Cadastre no GitHub (Settings → Secrets → Actions) `FTP_SERVER`, `FTP_USER`, `FTP_PASSWORD` e `FTP_DIR` (pasta do subdomínio, ex.: `/domains/teste.seudominio.com.br/public_html/`). `config.php` e os uploads não são sobrescritos.
