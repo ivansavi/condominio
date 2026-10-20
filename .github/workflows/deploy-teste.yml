@@ -1,4 +1,5 @@
-# Publica automaticamente no ambiente de TESTE (subdomínio da Hostinger) a cada push nesta branch.
+# Publica automaticamente no ambiente de TESTE (Hostinger) a cada push nesta branch.
+# O banco é criado/atualizado sozinho pelo app (database/migrations/*.sql).
 name: Deploy ambiente de teste
 on:
   push:
@@ -9,6 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Gerar config.php a partir dos secrets
+        env:
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          URL_BASE: ${{ secrets.URL_BASE }}
+          EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
+        run: |
+          php -r '$c = ["db_host" => getenv("DB_HOST") ?: "localhost", "db_nome" => getenv("DB_NAME"), "db_user" => getenv("DB_USER"), "db_pass" => getenv("DB_PASS"), "url_base" => getenv("URL_BASE"), "email_remetente" => getenv("EMAIL_REMETENTE") ?: "nao-responder@localhost", "debug" => false]; file_put_contents("config.php", "<?php\nreturn " . var_export($c, true) . ";\n");'
       - uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -18,7 +29,6 @@ jobs:
           exclude: |
             **/.git*
             **/.git*/**
-            config.php
             storage/uploads/**
             tools/**
             README.md

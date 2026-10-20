@@ -33,12 +33,42 @@ function db(): PDO {
             [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]
         );
         $pdo->exec("SET time_zone = '-03:00'");
+        migrar($pdo);
     } catch (Throwable $e) {
         http_response_code(500);
         exit(cfg('debug') ? e($e->getMessage()) : 'Não foi possível conectar ao banco de dados.');
     }
     return $pdo;
 }
+/** Aplica automaticamente os arquivos de database/migrations/*.sql ainda não executados (ordem alfabética). */
+function migrar(PDO $pdo): void {
+    $arqs = glob(RAIZ . '/database/migrations/*.sql') ?: [];
+    sort($arqs);
+    $feitos = static function () use ($pdo): array {
+        try { return $pdo->query('SELECT arquivo FROM schema_versao')->fetchAll(PDO::FETCH_COLUMN); }
+        catch (PDOException $e) {
+            $pdo->exec('CREATE TABLE IF NOT EXISTS schema_versao (arquivo VARCHAR(100) NOT NULL PRIMARY KEY, aplicado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4');
+            return [];
+        }
+    };
+    $pend = array_filter($arqs, fn($f) => !in_array(basename($f), $feitos(), true));
+    if (!$pend) return;
+    $pdo->query("SELECT GET_LOCK('condo_migrar', 30)")->fetchColumn();
+    try {
+        $ja = $feitos();
+        foreach ($pend as $f) {
+            if (in_array(basename($f), $ja, true)) continue; // outra requisição já aplicou
+            foreach (preg_split('/;\s*\n/', (string)file_get_contents($f)) as $cmd) {
+                $cmd = trim(preg_replace('/^--.*$/m', '', $cmd));
+                if ($cmd !== '') $pdo->exec($cmd);
+            }
+            $pdo->prepare('INSERT INTO schema_versao (arquivo) VALUES (?)')->execute([basename($f)]);
+        }
+    } finally {
+        $pdo->query("SELECT RELEASE_LOCK('condo_migrar')")->fetchColumn();
+    }
+}
+
 function q(string $sql, array $params = []): PDOStatement { $st = db()->prepare($sql); $st->execute($params); return $st; }
 function linha(string $sql, array $p = []): ?array { $r = q($sql, $p)->fetch(); return $r ?: null; }
 function linhas(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(); }

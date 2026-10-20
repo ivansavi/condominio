@@ -1,5 +1,5 @@
 <?php
-// Instalador: cria as tabelas e o primeiro usuário da Gestão. APAGUE este arquivo depois de usar.
+// Instalador: cria o primeiro usuário da Gestão (as tabelas são criadas sozinhas por database/migrations). APAGUE este arquivo depois de usar.
 declare(strict_types=1);
 require __DIR__ . '/src/app.php';
 
@@ -15,10 +15,6 @@ if (eh_post()) {
     if ($nome === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($s) < 8 || post('condominio') === '') {
         flash('Preencha todos os campos (senha com no mínimo 8 caracteres).', 'erro');
     } else {
-        foreach (preg_split('/;\s*\n/', file_get_contents(__DIR__ . '/database/schema.sql')) as $cmd) {
-            $cmd = trim(preg_replace('/^--.*$/m', '', $cmd));
-            if ($cmd !== '') db()->exec($cmd);
-        }
         q("INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?,?,?,'gestao')", [$nome, $email, password_hash($s, PASSWORD_DEFAULT)]);
         conf_set('condominio_nome', post('condominio'));
         conf_set('multa_pct', '2'); conf_set('juros_mensal_pct', '1'); conf_set('dia_vencimento', '10');
