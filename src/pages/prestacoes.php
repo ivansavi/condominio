@@ -1,6 +1,6 @@
 <?php
 pagina_inicio('Prestação de contas');
-$ms = linhas('SELECT competencia FROM prestacoes WHERE publicada = 1 ORDER BY competencia DESC');
+$ms = linhas('SELECT competencia FROM prestacoes WHERE condominio_id = ? AND publicada = 1 ORDER BY competencia DESC', [cid()]);
 ?>
 <p class="muted">Veja para onde vai o dinheiro do condomínio: receitas, despesas e saldo de cada mês.</p>
 <?php foreach ($ms as $m):
@@ -11,5 +11,5 @@ $ms = linhas('SELECT competencia FROM prestacoes WHERE publicada = 1 ORDER BY co
   </a>
 <?php endforeach;
 if (!$ms) echo '<div class="card vazio">Nenhuma prestação de contas publicada ainda.</div>';
-if (eh_gestao()) echo '<a class="btn" href="' . e(url('contas_gestao')) . '">Gerenciar prestações</a>';
+if (pode('contas')) echo '<a class="btn" href="' . e(url('contas_gestao')) . '">Gerenciar prestações</a>';
 pagina_fim();

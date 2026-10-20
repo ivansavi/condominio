@@ -22,16 +22,9 @@ function registrar_historico(string $entidade, int $id, array $dif): void {
 
 function sim_nao($v): string { return $v ? 'Sim' : 'Não'; }
 
-function retrato_usuario(array $u, ?array $unidade): array {
-    return [
-        'Nome' => $u['nome'] ?? '', 'E-mail' => $u['email'] ?? '', 'CPF' => $u['cpf'] ?? '', 'Telefone' => $u['telefone'] ?? '', 'WhatsApp' => $u['whatsapp'] ?? '',
-        'Tipo de acesso' => perfil_label(['perfil' => $u['perfil'] ?? 'condomino', 'acesso_gestao' => $u['acesso_gestao'] ?? 0]),
-        'Unidade' => $unidade ? nome_unidade($unidade) : '',
-        'Situação' => ['proprietario' => 'Proprietário', 'inquilino' => 'Inquilino'][$u['tipo_morador'] ?? ''] ?? '',
-        'Data da compra' => !empty($u['data_compra']) ? data_br($u['data_compra']) : '',
-        'Data da venda' => !empty($u['data_venda']) ? data_br($u['data_venda']) : '',
-        'Cadastro ativo' => sim_nao($u['ativo'] ?? 1),
-    ];
+function retrato_usuario(array $u, ?string $nivel = null): array {
+    return ['Nome' => $u['nome'] ?? '', 'E-mail' => $u['email'] ?? '', 'CPF' => $u['cpf'] ?? '', 'Telefone' => $u['telefone'] ?? '', 'WhatsApp' => $u['whatsapp'] ?? '',
+        'Nível de acesso' => $nivel ?? '', 'Cadastro ativo' => sim_nao($u['ativo'] ?? 1)];
 }
 
 function retrato_unidade(array $u): array {
@@ -60,4 +53,9 @@ function pagina_confirmar_alteracao(array $dif, string $titulo, string $voltar):
 function data_valida(string $s): ?string {
     if (!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $s, $m)) return null;
     return checkdate((int)$m[2], (int)$m[3], (int)$m[1]) ? $s : null;
+}
+
+/** Replica nome, CPF, telefone e e-mail do cadastro nos vínculos das unidades (histórico de proprietários/locatários). */
+function atualizar_dados_vinculos(int $uid): void {
+    q('UPDATE unidade_vinculos v JOIN usuarios u ON u.id = v.usuario_id SET v.nome = u.nome, v.cpf = u.cpf, v.telefone = COALESCE(u.telefone, u.whatsapp), v.email = u.email WHERE u.id = ?', [$uid]);
 }

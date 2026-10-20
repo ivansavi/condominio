@@ -1,6 +1,6 @@
 <?php
 $id = (int)get('id');
-$x = $id ? linha('SELECT * FROM unidades WHERE id = ?', [$id]) : null;
+$x = $id ? unidade_do_condominio($id) : null;
 if ($id && !$x) redirect('unidades');
 if (eh_post()) {
     if (post('acao') === 'lote') { // cadastro em lote: "101,102,103" ou "101-110"
@@ -9,8 +9,8 @@ if (eh_post()) {
             $nums = [$tok];
             if (preg_match('/^(\d+)-(\d+)$/', $tok, $m) && (int)$m[2] - (int)$m[1] <= 500) $nums = range((int)$m[1], (int)$m[2]);
             foreach ($nums as $num) {
-                if (!valor('SELECT id FROM unidades WHERE bloco = ? AND numero = ?', [$bloco, (string)$num])) {
-                    q('INSERT INTO unidades (bloco, numero, valor_condominio) VALUES (?,?,?)', [$bloco, (string)$num, $valor]); $n++;
+                if (!valor('SELECT id FROM unidades WHERE condominio_id = ? AND bloco = ? AND numero = ?', [cid(), $bloco, (string)$num])) {
+                    q('INSERT INTO unidades (condominio_id, bloco, numero, valor_condominio) VALUES (?,?,?,?)', [cid(), $bloco, (string)$num, $valor]); $n++;
                 }
             }
         }
@@ -18,7 +18,7 @@ if (eh_post()) {
     }
     $novo = ['bloco' => post('bloco'), 'numero' => post('numero'), 'valor_condominio' => ler_dinheiro(post('valor_condominio')), 'ativo' => $x ? (post('ativo') ? 1 : 0) : 1];
     if ($novo['numero'] === '') flash('Informe o número da unidade.', 'erro');
-    elseif (valor('SELECT id FROM unidades WHERE bloco = ? AND numero = ? AND id <> ?', [$novo['bloco'], $novo['numero'], $id])) flash('Esta unidade já existe.', 'erro');
+    elseif (valor('SELECT id FROM unidades WHERE condominio_id = ? AND bloco = ? AND numero = ? AND id <> ?', [cid(), $novo['bloco'], $novo['numero'], $id])) flash('Esta unidade já existe.', 'erro');
     elseif ($x) {
         $dif = diferencas(retrato_unidade($x), retrato_unidade($novo));
         if (!$dif) { flash('Nenhuma alteração foi feita.'); redirect('unidade', ['id' => $id]); }
@@ -27,7 +27,7 @@ if (eh_post()) {
         if (post('confirmar') === 'sim') registrar_historico('unidade', $id, $dif);
         flash('Unidade atualizada.'); redirect('unidade', ['id' => $id]);
     } else {
-        q('INSERT INTO unidades (bloco, numero, valor_condominio) VALUES (?,?,?)', [$novo['bloco'], $novo['numero'], $novo['valor_condominio']]);
+        q('INSERT INTO unidades (condominio_id, bloco, numero, valor_condominio) VALUES (?,?,?,?)', [cid(), $novo['bloco'], $novo['numero'], $novo['valor_condominio']]);
         registrar_historico('unidade', (int)db()->lastInsertId(), ['Cadastro' => ['', 'Criada']]);
         flash('Unidade cadastrada.'); redirect('unidades');
     }

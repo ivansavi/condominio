@@ -1,9 +1,9 @@
 <?php
 $comp = competencia_valida(get('c'));
-$pr = $comp ? linha('SELECT * FROM prestacoes WHERE competencia = ?', [$comp]) : null;
-if (!$pr || (!$pr['publicada'] && !eh_gestao())) { http_response_code(404); pagina_inicio('Prestação de contas', ['voltar' => url('prestacoes')]); echo '<div class="card">Prestação não encontrada.</div>'; pagina_fim(); return; }
+$pr = $comp ? linha('SELECT * FROM prestacoes WHERE condominio_id = ? AND competencia = ?', [cid(), $comp]) : null;
+if (!$pr || (!$pr['publicada'] && !pode('contas'))) { http_response_code(404); pagina_inicio('Prestação de contas', ['voltar' => url('prestacoes')]); echo '<div class="card">Prestação não encontrada.</div>'; pagina_fim(); return; }
 $r = resumo_mes($comp);
-$anexos = linhas('SELECT * FROM prestacao_anexos WHERE competencia = ? ORDER BY id', [$comp]);
+$anexos = linhas('SELECT * FROM prestacao_anexos WHERE condominio_id = ? AND competencia = ? ORDER BY id', [cid(), $comp]);
 pagina_inicio(mes_ano($comp), ['voltar' => url('prestacoes')]);
 if (!$pr['publicada']): ?><div class="alerta alerta-aviso">Rascunho: os condôminos ainda não veem esta prestação.</div><?php endif; ?>
 <section class="card resumo">

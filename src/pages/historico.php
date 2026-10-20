@@ -1,12 +1,17 @@
 <?php
-$ent = get('e') === 'unidade' ? 'unidade' : 'usuario';
+$ent = in_array(get('e'), ['unidade', 'condominio'], true) ? get('e') : 'usuario';
 $id = (int)get('id');
 if ($ent === 'usuario') {
+    if (!pode('moradores')) { http_response_code(403); exit('Acesso negado.'); }
     $alvo = linha('SELECT nome FROM usuarios WHERE id = ?', [$id]);
     $nome = $alvo['nome'] ?? 'Cadastro'; $volta = url('usuario', ['id' => $id]);
-} else {
-    $alvo = linha('SELECT bloco, numero FROM unidades WHERE id = ?', [$id]);
+} elseif ($ent === 'unidade') {
+    if (!pode('moradores')) { http_response_code(403); exit('Acesso negado.'); }
+    $alvo = unidade_do_condominio($id);
     $nome = $alvo ? nome_unidade($alvo) : 'Unidade'; $volta = url('unidade', ['id' => $id]);
+} else {
+    if (!pode('condominio')) { http_response_code(403); exit('Acesso negado.'); }
+    $id = cid(); $alvo = condominio_atual(); $nome = $alvo['nome'] ?? 'Condomínio'; $volta = url('config');
 }
 if (!$alvo) redirect('mais');
 $rows = linhas('SELECT * FROM historico_alteracoes WHERE entidade = ? AND entidade_id = ? ORDER BY criado_em DESC, id', [$ent, $id]);

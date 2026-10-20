@@ -15,9 +15,9 @@ if (eh_post()) {
     if ($nome === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($s) < 8 || post('condominio') === '') {
         flash('Preencha todos os campos (senha com no mínimo 8 caracteres).', 'erro');
     } else {
-        q("INSERT INTO usuarios (nome, email, senha_hash, perfil) VALUES (?,?,?,'gestao')", [$nome, $email, password_hash($s, PASSWORD_DEFAULT)]);
+        q('INSERT INTO usuarios (nome, email, senha_hash, super_admin) VALUES (?,?,?,1)', [$nome, $email, password_hash($s, PASSWORD_DEFAULT)]);
+        q('INSERT INTO acessos (usuario_id, condominio_id, nivel_id) VALUES (?, 1, ?)', [db()->lastInsertId(), semear_niveis(1)]);
         conf_set('condominio_nome', post('condominio'));
-        conf_set('multa_pct', '2'); conf_set('juros_mensal_pct', '1'); conf_set('dia_vencimento', '10');
         if (post('demo')) { require __DIR__ . '/src/demo.php'; carregar_demo(); }
         $pronto = true;
     }

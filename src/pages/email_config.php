@@ -15,7 +15,7 @@ if (eh_post()) {
         $ok = enviar_email($me['email'], 'Teste de e-mail', "Se você recebeu esta mensagem, o envio de e-mails está funcionando.", ['tipo' => 'teste', 'botao' => ['Abrir o aplicativo', link_app('inicio')]]);
         flash($ok ? 'E-mail de teste enviado para ' . $me['email'] . '. Confira a caixa de entrada e o spam.' : 'Falhou: ' . ($GLOBALS['ultimo_erro_email'] ?? 'erro desconhecido'), $ok ? 'ok' : 'erro');
     } elseif ($acao === 'lembretes') {
-        $r = processar_lembretes();
+        $r = processar_lembretes(cid());
         $tot = array_sum(array_column($r, 'cobrancas'));
         flash($tot ? "Lembretes enviados para $tot cobrança(s)." : 'Nenhum lembrete pendente no momento.');
     }

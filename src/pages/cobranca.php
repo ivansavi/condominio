@@ -1,8 +1,8 @@
 <?php
 $id = (int)get('id');
-$c = $id ? linha('SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE c.id = ?', [$id]) : null;
+$c = $id ? linha('SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE c.id = ? AND un.condominio_id = ?', [$id, cid()]) : null;
 if ($id && !$c) { flash('Cobrança não encontrada.', 'erro'); redirect('cobrancas'); }
-$unidades = linhas('SELECT * FROM unidades WHERE ativo = 1 ORDER BY bloco, CAST(numero AS UNSIGNED), numero');
+$unidades = linhas('SELECT * FROM unidades WHERE condominio_id = ? AND ativo = 1 ORDER BY bloco, CAST(numero AS UNSIGNED), numero', [cid()]);
 
 if (eh_post()) {
     $acao = post('acao', 'salvar');
@@ -23,6 +23,7 @@ if (eh_post()) {
         }
         $comp = competencia_valida(post('competencia')); $venc = post('vencimento'); $valor = ler_dinheiro(post('valor'));
         $unidade = $c ? (int)$c['unidade_id'] : (int)post('unidade_id');
+        if (!$c && !unidade_do_condominio($unidade)) $unidade = 0;
         if (!$comp || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $venc) || $valor <= 0 || !$unidade) throw new RuntimeException('Preencha unidade, mês, vencimento e valor.');
         $arq = salvar_upload('arquivo');
         $campos = [$comp, post('descricao') ?: 'Taxa de condomínio', $valor, $venc, post('linha_digitavel') ?: null, post('pix_copia_cola') ?: null, post('observacao') ?: null];

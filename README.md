@@ -2,15 +2,15 @@
 
 PHP 8 + MySQL, sem dependências, feito para hospedagem compartilhada da Hostinger. Interface pensada para celular (menu inferior, botões grandes, instalável na tela inicial).
 
-## Perfis
-| Perfil | O que faz |
-|---|---|
-| **Condômino** | Vê e copia boletos (linha digitável / Pix / PDF), histórico financeiro, prestação de contas, avisos; edita contatos e senha |
-| **Síndico/Administrador** | Cadastra moradores e unidades (gera o login), publica comunicados, vê inadimplência e prestações |
-| **Gestão** | Tudo do síndico + gera cobranças/boletos, dá baixa, lança despesas/receitas, publica a prestação de contas, configurações |
+## Condomínios, níveis de acesso e perfis
+- **Vários condomínios, um só cadastro:** o mesmo e-mail/senha acessa todos os condomínios em que a pessoa tem unidade ou função. Um morador pode ter unidades em condomínios diferentes e alterna pelo nome do condomínio no topo (ou *Mais → Trocar de condomínio*). Ao cadastrar alguém cujo e-mail já existe, o app reaproveita o cadastro.
+- **Gestor principal** (criado na instalação): tem acesso total a todos os condomínios, cadastra novos condomínios, edita dados e logo, cadastra usuários e cria níveis de acesso.
+- **Níveis de acesso** (por condomínio, em *Mais → Níveis de acesso*): já vêm "Gestor principal", "Gestão" e "Síndico / Administrador". Dá para criar outros escolhendo permissões: moradores/unidades, comunicados, ver financeiro, cobranças, prestação de contas, e-mails, dados do condomínio e níveis.
+- **Condômino:** vê e copia boletos, histórico financeiro, prestação de contas, avisos; edita contatos, foto e senha.
+- Não existe auto-cadastro: todo login é criado por quem tem permissão, com senha provisória (envio por WhatsApp/e-mail; troca exigida no 1º acesso).
 
-Um síndico pode receber também o acesso à Gestão (caixa "Síndico também acessa o portal da gestão"), compartilhando o mesmo portal.
-Não existe auto-cadastro: todo login é criado por síndico ou gestão, com senha provisória (envio por WhatsApp em 1 toque; a troca é exigida no 1º acesso).
+## Perfil, foto e aparência
+Cada pessoa pode enviar foto (escolher da galeria ou tirar na hora, com enquadramento por arrastar, zoom e girar) e escolher tema claro, escuro ou automático (também pelo botão de lua/sol no topo).
 
 ## Instalação na Hostinger
 1. **hPanel → Bancos de Dados → MySQL**: crie o banco e o usuário; anote nome, usuário e senha.
@@ -18,7 +18,7 @@ Não existe auto-cadastro: todo login é criado por síndico ou gestão, com sen
 3. Copie `config.sample.php` para `config.php` e preencha banco, `url_base` e `email_remetente` (no ambiente de teste o deploy automático gera esse arquivo a partir dos secrets do GitHub).
 4. Acesse `https://seudominio.com.br/instalar.php`, informe o condomínio e crie o usuário da Gestão.
 5. **Apague `instalar.php`** do servidor.
-6. Em *Mais → Dados do condomínio* informe CNPJ, chave Pix, multa/juros e saldo inicial; depois cadastre as unidades (há cadastro em lote, ex.: `101-110, 201-210`) e os moradores.
+6. Em *Mais → Dados do condomínio e logo* informe endereço, telefone, e-mail, logo, chave Pix, multa/juros e saldo inicial; depois cadastre as unidades (há cadastro em lote, ex.: `101-110, 201-210`) e os moradores.
 
 Ative o SSL grátis no hPanel; o `.htaccess` força HTTPS e bloqueia `config.php`, `src/`, `storage/` e `database/`.
 

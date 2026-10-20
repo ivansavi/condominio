@@ -30,7 +30,19 @@
   var tipo = document.querySelector('[data-tipo-morador]');
   if (tipo) {
     var ini = document.querySelector('[data-rot-inicio]'), fim = document.querySelector('[data-rot-fim]');
-    var rot = function () { var loc = tipo.value === 'inquilino'; ini.textContent = loc ? 'Início da locação' : 'Data da compra'; fim.textContent = loc ? 'Fim da locação' : 'Data da venda'; };
+    var rot = function () { var loc = tipo.value === 'inquilino' || tipo.value === 'locatario'; ini.textContent = loc ? 'Início da locação' : 'Data da compra'; fim.textContent = loc ? 'Fim da locação' : 'Data da venda'; };
     tipo.addEventListener('change', rot); rot();
   }
+  // Alternar entre versão clara e escura (salva no cadastro e neste aparelho)
+  var btnTema = document.querySelector('[data-tema-alternar]');
+  if (btnTema) btnTema.addEventListener('click', function () {
+    var raiz = document.documentElement;
+    var escuro = raiz.dataset.theme ? raiz.dataset.theme === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var novo = escuro ? 'claro' : 'escuro';
+    raiz.dataset.theme = escuro ? 'light' : 'dark';
+    try { localStorage.setItem('tema', novo); } catch (e) { }
+    var csrf = document.querySelector('meta[name=csrf]');
+    var f = new FormData(); f.append('csrf', csrf ? csrf.content : ''); f.append('tema', novo);
+    fetch('index.php?p=tema', { method: 'POST', body: f, credentials: 'same-origin' }).catch(function () { });
+  });
 })();

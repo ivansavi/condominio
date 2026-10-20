@@ -1,7 +1,7 @@
 <?php
 pagina_inicio('Inadimplência', ['voltar' => url('mais')]);
 $rows = linhas("SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id
-                WHERE c.status = 'aberto' AND c.vencimento < CURDATE() ORDER BY un.bloco, CAST(un.numero AS UNSIGNED), c.vencimento");
+                WHERE un.condominio_id = ? AND c.status = 'aberto' AND c.vencimento < CURDATE() ORDER BY un.bloco, CAST(un.numero AS UNSIGNED), c.vencimento", [cid()]);
 $por = [];
 foreach ($rows as $c) {
     $k = $c['unidade_id'];

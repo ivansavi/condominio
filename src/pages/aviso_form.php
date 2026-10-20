@@ -1,7 +1,7 @@
 <?php
 $me = usuario();
 $id = (int)get('id');
-$x = $id ? linha('SELECT * FROM comunicados WHERE id = ? AND ativo = 1', [$id]) : null;
+$x = $id ? linha('SELECT * FROM comunicados WHERE id = ? AND ativo = 1 AND condominio_id = ?', [$id, cid()]) : null;
 if ($id && !$x) redirect('avisos');
 if (eh_post()) {
     $t = post('titulo'); $c = post('corpo'); $imp = post('importante') ? 1 : 0;
@@ -9,7 +9,7 @@ if (eh_post()) {
     else {
         if ($x) { q('UPDATE comunicados SET titulo=?, corpo=?, importante=? WHERE id=?', [$t, $c, $imp, $id]); $novo = $id; }
         else {
-            q('INSERT INTO comunicados (titulo, corpo, importante, autor_id) VALUES (?,?,?,?)', [$t, $c, $imp, $me['id']]);
+            q('INSERT INTO comunicados (condominio_id, titulo, corpo, importante, autor_id) VALUES (?,?,?,?,?)', [cid(), $t, $c, $imp, $me['id']]);
             $novo = (int)db()->lastInsertId();
             if (post('email')) {
                 [$ok, $falha] = enviar_para_condominos($t, $c, ['tipo' => 'comunicado', 'botao' => ['Ver no aplicativo', link_app('aviso', ['id' => $novo])]]);

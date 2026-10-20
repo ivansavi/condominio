@@ -1,7 +1,7 @@
 <?php
 $comp = competencia_valida(get('c', post('c', date('Y-m')))) ?? date('Y-m-01');
 $ym = substr($comp, 0, 7);
-q('INSERT IGNORE INTO prestacoes (competencia) VALUES (?)', [$comp]);
+q('INSERT IGNORE INTO prestacoes (condominio_id, competencia) VALUES (?, ?)', [cid(), $comp]);
 $CATEGORIAS = ['Folha e encargos', 'Água e esgoto', 'Energia elétrica', 'Limpeza', 'Segurança / portaria', 'Manutenção', 'Elevadores', 'Administração', 'Seguros', 'Impostos e tarifas', 'Jardinagem', 'Outras despesas'];
 
 if (eh_post()) {
@@ -10,30 +10,30 @@ if (eh_post()) {
         if ($acao === 'lancar') {
             $valor = ler_dinheiro(post('valor')); $data = post('data'); $tipo = post('tipo') === 'receita' ? 'receita' : 'despesa';
             if ($valor <= 0 || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $data) || post('descricao') === '') throw new RuntimeException('Preencha descrição, data e valor.');
-            q('INSERT INTO lancamentos (competencia, tipo, categoria, descricao, valor, data) VALUES (?,?,?,?,?,?)', [$comp, $tipo, post('categoria') ?: 'Outras despesas', post('descricao'), $valor, $data]);
+            q('INSERT INTO lancamentos (condominio_id, competencia, tipo, categoria, descricao, valor, data) VALUES (?,?,?,?,?,?,?)', [cid(), $comp, $tipo, post('categoria') ?: 'Outras despesas', post('descricao'), $valor, $data]);
             flash('Lançamento adicionado.');
         } elseif ($acao === 'excluir_lanc') {
-            q('DELETE FROM lancamentos WHERE id = ? AND competencia = ?', [(int)post('id'), $comp]); flash('Lançamento removido.');
+            q('DELETE FROM lancamentos WHERE id = ? AND condominio_id = ? AND competencia = ?', [(int)post('id'), cid(), $comp]); flash('Lançamento removido.');
         } elseif ($acao === 'obs') {
-            q('UPDATE prestacoes SET observacao = ? WHERE competencia = ?', [post('observacao') ?: null, $comp]); flash('Mensagem salva.');
+            q('UPDATE prestacoes SET observacao = ? WHERE condominio_id = ? AND competencia = ?', [post('observacao') ?: null, cid(), $comp]); flash('Mensagem salva.');
         } elseif ($acao === 'publicar') {
-            q('UPDATE prestacoes SET publicada = 1, publicada_em = NOW() WHERE competencia = ?', [$comp]); flash('Prestação publicada para os condôminos!');
+            q('UPDATE prestacoes SET publicada = 1, publicada_em = NOW() WHERE condominio_id = ? AND competencia = ?', [cid(), $comp]); flash('Prestação publicada para os condôminos!');
             if (post('avisar_email')) { [$ok, $falha] = enviar_para_condominos('Prestação de contas de ' . mes_ano($comp), 'A prestação de contas de ' . mes_ano($comp) . " já está disponível no aplicativo.", ['tipo' => 'prestacao', 'botao' => ['Ver prestação de contas', link_app('prestacao', ['c' => $ym])]]); flash("$ok e-mail(s) enviado(s)" . ($falha ? ", $falha falha(s)" : '') . '.'); }
         } elseif ($acao === 'despublicar') {
-            q('UPDATE prestacoes SET publicada = 0 WHERE competencia = ?', [$comp]); flash('Prestação ocultada.');
+            q('UPDATE prestacoes SET publicada = 0 WHERE condominio_id = ? AND competencia = ?', [cid(), $comp]); flash('Prestação ocultada.');
         } elseif ($acao === 'anexar') {
             $arq = salvar_upload('arquivo'); if (!$arq) throw new RuntimeException('Escolha um arquivo.');
-            q('INSERT INTO prestacao_anexos (competencia, titulo, arquivo_id) VALUES (?,?,?)', [$comp, post('titulo') ?: 'Documento', $arq]); flash('Documento anexado.');
+            q('INSERT INTO prestacao_anexos (condominio_id, competencia, titulo, arquivo_id) VALUES (?,?,?,?)', [cid(), $comp, post('titulo') ?: 'Documento', $arq]); flash('Documento anexado.');
         } elseif ($acao === 'excluir_anexo') {
-            q('DELETE FROM prestacao_anexos WHERE id = ? AND competencia = ?', [(int)post('id'), $comp]); flash('Documento removido.');
+            q('DELETE FROM prestacao_anexos WHERE id = ? AND condominio_id = ? AND competencia = ?', [(int)post('id'), cid(), $comp]); flash('Documento removido.');
         }
     } catch (RuntimeException $ex) { flash($ex->getMessage(), 'erro'); }
     redirect('contas_gestao', ['c' => $ym]);
 }
 
-$pr = linha('SELECT * FROM prestacoes WHERE competencia = ?', [$comp]);
+$pr = linha('SELECT * FROM prestacoes WHERE condominio_id = ? AND competencia = ?', [cid(), $comp]);
 $r = resumo_mes($comp);
-$anexos = linhas('SELECT * FROM prestacao_anexos WHERE competencia = ? ORDER BY id', [$comp]);
+$anexos = linhas('SELECT * FROM prestacao_anexos WHERE condominio_id = ? AND competencia = ? ORDER BY id', [cid(), $comp]);
 $ant = date('Y-m', strtotime($comp . ' -1 month')); $prox = date('Y-m', strtotime($comp . ' +1 month'));
 pagina_inicio('Prestação de contas');
 ?>

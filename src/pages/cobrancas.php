@@ -2,14 +2,14 @@
 pagina_inicio('Cobranças');
 $comp = competencia_valida(get('c', date('Y-m'))) ?? date('Y-m-01');
 $st = get('s');
-$sql = 'SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE c.competencia = ?';
+$sql = 'SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE un.condominio_id = ? AND c.competencia = ?';
 if ($st === 'aberto') $sql .= " AND c.status = 'aberto' AND c.vencimento >= CURDATE()";
 elseif ($st === 'vencido') $sql .= " AND c.status = 'aberto' AND c.vencimento < CURDATE()";
 elseif ($st === 'pago') $sql .= " AND c.status = 'pago'";
 else $sql .= " AND c.status <> 'cancelado'";
 $sql .= ' ORDER BY un.bloco, CAST(un.numero AS UNSIGNED), c.id';
-$cobs = linhas($sql, [$comp]);
-$tot = linha("SELECT COALESCE(SUM(valor),0) AS emitido, COALESCE(SUM(CASE WHEN status='pago' THEN COALESCE(valor_pago,valor) END),0) AS recebido FROM cobrancas WHERE competencia = ? AND status <> 'cancelado'", [$comp]);
+$cobs = linhas($sql, [cid(), $comp]);
+$tot = linha("SELECT COALESCE(SUM(c.valor),0) AS emitido, COALESCE(SUM(CASE WHEN c.status='pago' THEN COALESCE(c.valor_pago,c.valor) END),0) AS recebido FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE un.condominio_id = ? AND c.competencia = ? AND c.status <> 'cancelado'", [cid(), $comp]);
 $ym = substr($comp, 0, 7);
 $ant = date('Y-m', strtotime($comp . ' -1 month')); $prox = date('Y-m', strtotime($comp . ' +1 month'));
 ?>

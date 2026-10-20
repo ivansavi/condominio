@@ -74,7 +74,17 @@ function linha(string $sql, array $p = []): ?array { $r = q($sql, $p)->fetch(); 
 function linhas(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(); }
 function valor(string $sql, array $p = []) { $r = q($sql, $p)->fetchColumn(); return $r === false ? null : $r; }
 
+/** Chaves de configuração que pertencem ao condomínio atual (coluna correspondente em `condominios`). */
+const CONF_CONDOMINIO = ['condominio_nome' => 'nome', 'condominio_cnpj' => 'cnpj', 'condominio_endereco' => 'endereco', 'condominio_telefone' => 'telefone',
+    'condominio_email' => 'email', 'pix_chave' => 'pix_chave', 'dia_vencimento' => 'dia_vencimento', 'multa_pct' => 'multa_pct',
+    'juros_mensal_pct' => 'juros_mensal_pct', 'saldo_inicial' => 'saldo_inicial'];
+
 function conf(string $chave, string $padrao = ''): string {
+    if (isset(CONF_CONDOMINIO[$chave])) {
+        $c = condominio_atual();
+        $v = $c[CONF_CONDOMINIO[$chave]] ?? null;
+        return $v === null || $v === '' ? $padrao : (string)$v;
+    }
     static $cache = null;
     if ($cache === null) {
         $cache = [];
@@ -83,6 +93,11 @@ function conf(string $chave, string $padrao = ''): string {
     return $cache[$chave] ?? $padrao;
 }
 function conf_set(string $chave, string $valor): void {
+    if (isset(CONF_CONDOMINIO[$chave])) {
+        q('UPDATE condominios SET ' . CONF_CONDOMINIO[$chave] . ' = ? WHERE id = ?', [$valor === '' ? null : $valor, cid()]);
+        unset($GLOBALS['cond_cache']);
+        return;
+    }
     q('INSERT INTO configuracoes (chave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)', [$chave, $valor]);
 }
 
@@ -131,15 +146,110 @@ function usuario(): ?array {
     if ($u !== false) return $u;
     $u = null;
     if (!empty($_SESSION['uid'])) {
-        $u = linha('SELECT u.*, un.bloco, un.numero FROM usuarios u LEFT JOIN unidades un ON un.id = u.unidade_id WHERE u.id = ? AND u.ativo = 1', [$_SESSION['uid']]);
+        $u = linha('SELECT * FROM usuarios WHERE id = ? AND ativo = 1', [$_SESSION['uid']]);
         if (!$u) unset($_SESSION['uid']);
     }
     return $u;
 }
-function eh_gestao(): bool { $u = usuario(); return $u && ($u['perfil'] === 'gestao' || ($u['perfil'] === 'sindico' && $u['acesso_gestao'])); }
-function eh_admin(): bool { $u = usuario(); return $u && in_array($u['perfil'], ['sindico', 'gestao'], true); }
-function perfil_label(array $u): string {
-    return match ($u['perfil']) { 'gestao' => 'Gestão', 'sindico' => 'Síndico/Administrador' . ($u['acesso_gestao'] ? ' + Gestão' : ''), default => 'Condômino' };
+
+/* ---------- Condomínios, níveis e permissões ---------- */
+const PERMISSOES = [
+    'moradores' => 'Moradores, unidades, proprietários e locatários',
+    'comunicados' => 'Comunicados e avisos',
+    'financeiro_ver' => 'Ver inadimplência e boletos das unidades',
+    'cobrancas' => 'Gerar cobranças e dar baixa em boletos',
+    'contas' => 'Prestação de contas (lançamentos e publicação)',
+    'emails' => 'E-mails e lembretes',
+    'condominio' => 'Dados do condomínio, logo e endereço',
+    'niveis' => 'Níveis de acesso e equipe (quem acessa o quê)',
+];
+
+/** Condomínios que o usuário logado pode abrir: onde tem nível de acesso ou vínculo ativo com uma unidade. */
+function condominios_acessiveis(): array {
+    $u = usuario();
+    if (!$u) return [];
+    static $cache = [];
+    if (isset($cache[$u['id']])) return $cache[$u['id']];
+    if ($u['super_admin']) return $cache[$u['id']] = linhas('SELECT * FROM condominios WHERE ativo = 1 ORDER BY nome');
+    return $cache[$u['id']] = linhas('SELECT c.* FROM condominios c WHERE c.ativo = 1 AND (
+            EXISTS (SELECT 1 FROM acessos a WHERE a.condominio_id = c.id AND a.usuario_id = ?)
+         OR EXISTS (SELECT 1 FROM unidade_vinculos v JOIN unidades un ON un.id = v.unidade_id
+                    WHERE un.condominio_id = c.id AND v.usuario_id = ? AND (v.data_fim IS NULL OR v.data_fim >= CURDATE()))) ORDER BY c.nome', [$u['id'], $u['id']]);
+}
+
+/** Força um condomínio específico (usado por rotinas sem login, como o envio de lembretes). */
+function usar_condominio(int $id): void { $GLOBALS['cond_forcado'] = $id; unset($GLOBALS['cond_cache']); }
+
+function condominio_atual(): ?array {
+    $id = $GLOBALS['cond_forcado'] ?? null;
+    if (!$id) {
+        $u = usuario();
+        if ($u) {
+            $lista = condominios_acessiveis();
+            $ids = array_map(fn($c) => (int)$c['id'], $lista);
+            foreach ([(int)($_SESSION['cond'] ?? 0), (int)$u['ultimo_condominio_id']] as $cand) if ($cand && in_array($cand, $ids, true)) { $id = $cand; break; }
+            if (!$id && $ids) $id = min($ids); // sem escolha anterior: o primeiro condomínio cadastrado
+            if ($id) $_SESSION['cond'] = $id;
+        } else {
+            try { if ((int)valor('SELECT COUNT(*) FROM condominios') === 1) $id = (int)valor('SELECT id FROM condominios'); } catch (PDOException $e) { return null; }
+        }
+    }
+    if (!$id) return null;
+    if (($GLOBALS['cond_cache']['id'] ?? 0) !== $id) {
+        try { $GLOBALS['cond_cache'] = linha('SELECT * FROM condominios WHERE id = ?', [$id]) ?? []; } catch (PDOException $e) { return null; }
+    }
+    return $GLOBALS['cond_cache'] ?: null;
+}
+function cid(): int { return (int)(condominio_atual()['id'] ?? 0); }
+
+/** Nível de acesso do usuário no condomínio atual (null = apenas condômino). */
+function nivel_atual(): ?array {
+    $u = usuario(); if (!$u) return null;
+    static $cache = [];
+    $k = $u['id'] . ':' . cid();
+    if (!array_key_exists($k, $cache)) $cache[$k] = linha('SELECT n.* FROM acessos a JOIN niveis_acesso n ON n.id = a.nivel_id WHERE a.usuario_id = ? AND a.condominio_id = ?', [$u['id'], cid()]);
+    return $cache[$k];
+}
+function permissoes_atuais(): array {
+    $u = usuario(); if (!$u) return [];
+    if ($u['super_admin']) return array_keys(PERMISSOES);
+    $n = nivel_atual();
+    return $n ? array_values(array_filter(explode(',', $n['permissoes']))) : [];
+}
+function pode(string $perm): bool { return in_array($perm, permissoes_atuais(), true); }
+function eh_admin(): bool { $u = usuario(); return $u && ($u['super_admin'] || nivel_atual()); }
+function eh_gestao(): bool { return pode('cobrancas'); }
+function rotulo_acesso(): string {
+    $u = usuario();
+    if ($u && $u['super_admin']) return 'Gestor principal (todos os condomínios)';
+    return nivel_atual()['nome'] ?? 'Condômino';
+}
+
+/** Unidades do usuário no condomínio atual (vínculo ainda ativo). */
+function unidades_do_usuario(?int $uid = null): array {
+    $uid ??= (int)(usuario()['id'] ?? 0);
+    return linhas('SELECT un.*, v.tipo, v.data_inicio, v.data_fim FROM unidade_vinculos v JOIN unidades un ON un.id = v.unidade_id
+                   WHERE v.usuario_id = ? AND un.condominio_id = ? AND (v.data_fim IS NULL OR v.data_fim >= CURDATE()) ORDER BY un.bloco, CAST(un.numero AS UNSIGNED), un.numero', [$uid, cid()]);
+}
+function ids_unidades_do_usuario(): array { return array_map(fn($u) => (int)$u['id'], unidades_do_usuario()); }
+function unidade_do_condominio(int $id): ?array { return linha('SELECT * FROM unidades WHERE id = ? AND condominio_id = ?', [$id, cid()]); }
+
+/** Cria os níveis de acesso padrão de um condomínio novo. */
+function semear_niveis(int $cond): int {
+    $padrao = [
+        ['Gestor principal', 'Acesso total ao condomínio', implode(',', array_keys(PERMISSOES)), 1],
+        ['Gestão', 'Boletos, prestação de contas, moradores e e-mails', 'moradores,comunicados,financeiro_ver,cobrancas,contas,emails', 0],
+        ['Síndico / Administrador', 'Moradores, comunicados e acompanhamento financeiro', 'moradores,comunicados,financeiro_ver', 0],
+    ];
+    foreach ($padrao as [$nome, $desc, $perms, $sis]) q('INSERT IGNORE INTO niveis_acesso (condominio_id, nome, descricao, permissoes, sistema) VALUES (?,?,?,?,?)', [$cond, $nome, $desc, $perms, $sis]);
+    return (int)valor("SELECT id FROM niveis_acesso WHERE condominio_id = ? AND nome = 'Gestor principal'", [$cond]);
+}
+
+/** Foto de perfil (ou a inicial do nome). */
+function avatar(array $u, int $px = 40): string {
+    $estilo = ' style="--s:' . $px . 'px"';
+    if (!empty($u['foto_arquivo_id'])) return '<img class="av" src="' . e(url('arquivo', ['id' => $u['foto_arquivo_id']])) . '" alt=""' . $estilo . '>';
+    return '<span class="av"' . $estilo . '>' . e(mb_strtoupper(mb_substr($u['nome'], 0, 1))) . '</span>';
 }
 
 function logar(array $u): void {
@@ -180,9 +290,9 @@ function selo(array $c): string {
 function resumo_mes(string $comp): array {
     $ini = $comp; $fim = date('Y-m-d', strtotime($comp . ' +1 month'));
     $pagas = linhas("SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id
-                     WHERE c.status = 'pago' AND c.data_pagamento >= ? AND c.data_pagamento < ? ORDER BY c.data_pagamento", [$ini, $fim]);
+                     WHERE un.condominio_id = ? AND c.status = 'pago' AND c.data_pagamento >= ? AND c.data_pagamento < ? ORDER BY c.data_pagamento", [cid(), $ini, $fim]);
     $rec_cond = array_sum(array_map(fn($c) => (float)($c['valor_pago'] ?? $c['valor']), $pagas));
-    $lanc = linhas('SELECT * FROM lancamentos WHERE competencia = ? ORDER BY data, id', [$comp]);
+    $lanc = linhas('SELECT * FROM lancamentos WHERE condominio_id = ? AND competencia = ? ORDER BY data, id', [cid(), $comp]);
     $outras_rec = 0.0; $desp = 0.0; $por_cat = [];
     foreach ($lanc as $l) {
         if ($l['tipo'] === 'receita') $outras_rec += (float)$l['valor'];
@@ -190,8 +300,8 @@ function resumo_mes(string $comp): array {
     }
     arsort($por_cat);
     // saldo anterior = saldo inicial + resultado de todos os meses anteriores
-    $ant_cond = (float)valor("SELECT COALESCE(SUM(COALESCE(valor_pago, valor)),0) FROM cobrancas WHERE status='pago' AND data_pagamento < ?", [$ini]);
-    $ant_lanc = (float)valor("SELECT COALESCE(SUM(CASE WHEN tipo='receita' THEN valor ELSE -valor END),0) FROM lancamentos WHERE competencia < ?", [$ini]);
+    $ant_cond = (float)valor("SELECT COALESCE(SUM(COALESCE(c.valor_pago, c.valor)),0) FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE un.condominio_id = ? AND c.status='pago' AND c.data_pagamento < ?", [cid(), $ini]);
+    $ant_lanc = (float)valor("SELECT COALESCE(SUM(CASE WHEN tipo='receita' THEN valor ELSE -valor END),0) FROM lancamentos WHERE condominio_id = ? AND competencia < ?", [cid(), $ini]);
     $saldo_ant = (float)conf('saldo_inicial', '0') + $ant_cond + $ant_lanc;
     $receitas = $rec_cond + $outras_rec;
     return [
@@ -216,6 +326,34 @@ function salvar_upload(string $campo): ?int {
     return (int)db()->lastInsertId();
 }
 
+/** Re-codifica uma imagem enviada (JPG/PNG/WebP) com GD: remove metadados, limita o tamanho e devolve o id em `arquivos`. */
+function salvar_imagem(string $campo, int $max_px, bool $png): ?int {
+    if (empty($_FILES[$campo]) || $_FILES[$campo]['error'] === UPLOAD_ERR_NO_FILE) return null;
+    $f = $_FILES[$campo];
+    if ($f['error'] !== UPLOAD_ERR_OK) throw new RuntimeException('Falha no envio da imagem.');
+    if ($f['size'] > 8 * 1024 * 1024) throw new RuntimeException('Imagem muito grande (máximo 8 MB).');
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) throw new RuntimeException('Envie uma imagem JPG, PNG ou WebP.');
+    $img = @imagecreatefromstring((string)file_get_contents($f['tmp_name']));
+    if (!$img) throw new RuntimeException('Não foi possível ler a imagem.');
+    $w = imagesx($img); $h = imagesy($img);
+    if (max($w, $h) > $max_px) { $img = imagescale($img, $w >= $h ? $max_px : (int)round($w * $max_px / $h), $w >= $h ? (int)round($h * $max_px / $w) : $max_px); }
+    $nome = bin2hex(random_bytes(16)) . ($png ? '.png' : '.jpg');
+    $destino = RAIZ . '/storage/uploads/' . $nome;
+    if ($png) { imagealphablending($img, false); imagesavealpha($img, true); imagepng($img, $destino, 6); }
+    else {
+        $fundo = imagecreatetruecolor(imagesx($img), imagesy($img)); imagefill($fundo, 0, 0, imagecolorallocate($fundo, 255, 255, 255));
+        imagecopy($fundo, $img, 0, 0, 0, 0, imagesx($img), imagesy($img)); imagejpeg($fundo, $destino, 88);
+    }
+    q('INSERT INTO arquivos (nome_original, caminho, mime, tamanho) VALUES (?,?,?,?)', [$png ? 'logo.png' : 'foto.jpg', $nome, $png ? 'image/png' : 'image/jpeg', filesize($destino)]);
+    return (int)db()->lastInsertId();
+}
+function apagar_arquivo(?int $id): void {
+    if (!$id) return;
+    $f = linha('SELECT caminho FROM arquivos WHERE id = ?', [$id]);
+    if ($f) { @unlink(RAIZ . '/storage/uploads/' . basename($f['caminho'])); q('DELETE FROM arquivos WHERE id = ?', [$id]); }
+}
+
 require __DIR__ . '/historico.php';
 require __DIR__ . '/email.php';
 require __DIR__ . '/lembretes.php';
@@ -223,7 +361,7 @@ require __DIR__ . '/lembretes.php';
 /* ---------- Layout ---------- */
 function avisos_nao_lidos(): int {
     $u = usuario(); if (!$u) return 0;
-    return (int)valor('SELECT COUNT(*) FROM comunicados c WHERE c.ativo = 1 AND NOT EXISTS (SELECT 1 FROM comunicado_leituras l WHERE l.comunicado_id = c.id AND l.usuario_id = ?)', [$u['id']]);
+    return (int)valor('SELECT COUNT(*) FROM comunicados c WHERE c.ativo = 1 AND c.condominio_id = ? AND NOT EXISTS (SELECT 1 FROM comunicado_leituras l WHERE l.comunicado_id = c.id AND l.usuario_id = ?)', [cid(), $u['id']]);
 }
 
 const ICONES = [
@@ -252,6 +390,11 @@ const ICONES = [
     'check' => 'M20 6L9 17l-5-5',
     'desfazer' => 'M3 7v6h6M3 13a9 9 0 1 0 3-7',
     'email' => 'M3 5h18v14H3zM3 7l9 7 9-7',
+    'lua' => 'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',
+    'sol' => 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4',
+    'camera' => 'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8',
+    'imagem' => 'M3 3h18v18H3zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M21 15l-5-5L5 21',
+    'escudo' => 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
 ];
 
 /** Ícone de linha (SVG inline). $tam em pixels. */
@@ -269,7 +412,7 @@ function emojis_para_icones(string $html): string {
 }
 
 function menu_principal(): array {
-    if (eh_gestao()) return [['inicio', 'Início', 'inicio'], ['cobrancas', 'Cobranças', 'boleto'], ['contas_gestao', 'Contas', 'contas'], ['avisos', 'Avisos', 'avisos'], ['mais', 'Mais', 'mais']];
+    if (pode('cobrancas')) return [['inicio', 'Início', 'inicio'], ['cobrancas', 'Cobranças', 'boleto'], ['contas_gestao', 'Contas', 'contas'], ['avisos', 'Avisos', 'avisos'], ['mais', 'Mais', 'mais']];
     if (eh_admin()) return [['inicio', 'Início', 'inicio'], ['usuarios', 'Moradores', 'moradores'], ['prestacoes', 'Contas', 'contas'], ['avisos', 'Avisos', 'avisos'], ['mais', 'Mais', 'mais']];
     return [['inicio', 'Início', 'inicio'], ['boletos', 'Boletos', 'boleto'], ['prestacoes', 'Contas', 'contas'], ['avisos', 'Avisos', 'avisos'], ['perfil', 'Perfil', 'perfil']];
 }
@@ -278,18 +421,25 @@ function pagina_inicio(string $titulo, array $o = []): void {
     ob_start();
     $u = usuario(); $atual = $GLOBALS['pagina_atual'] ?? '';
     $nome = conf('condominio_nome', 'Condomínio');
-    echo '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">',
+    $tema = ['claro' => 'light', 'escuro' => 'dark'][$u['tema'] ?? 'auto'] ?? '';
+    $cond = condominio_atual(); $varios = $u && count(condominios_acessiveis()) > 1;
+    echo '<!doctype html><html lang="pt-BR"', $tema ? ' data-theme="' . $tema . '"' : '', '><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
-        '<meta name="theme-color" content="#0f766e"><link rel="manifest" href="assets/manifest.webmanifest">',
+        '<meta name="theme-color" content="#0f766e"><meta name="csrf" content="', e(csrf_token()), '"><link rel="manifest" href="assets/manifest.webmanifest">',
         '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
         '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">',
-        '<link rel="icon" href="assets/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="assets/icon.svg">',
-        '<title>', e($titulo), ' · ', e($nome), '</title><link rel="stylesheet" href="assets/app.css?v=2"></head><body>';
+        '<link rel="icon" href="assets/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="assets/icon.svg">';
+    if (!$u) echo "<script>try{var t=localStorage.getItem('tema');if(t==='claro')document.documentElement.dataset.theme='light';else if(t==='escuro')document.documentElement.dataset.theme='dark'}catch(e){}</script>";
+    echo '<title>', e($titulo), ' · ', e($nome), '</title><link rel="stylesheet" href="assets/app.css?v=3"></head><body>';
     if ($u) {
         echo '<header class="topo"><div class="topo-in">';
         if (!empty($o['voltar'])) echo '<a class="voltar" href="', e($o['voltar']), '" aria-label="Voltar">‹</a>';
-        echo '<div class="topo-tit"><strong>', e($titulo), '</strong><small>', e($nome), '</small></div>';
-        echo '<a class="topo-user" href="', e(url('perfil')), '" aria-label="Meu perfil">', e(mb_strtoupper(mb_substr($u['nome'], 0, 1))), '</a>';
+        elseif (!empty($cond['logo_arquivo_id'])) echo '<img class="logo-topo" src="', e(url('arquivo', ['id' => $cond['logo_arquivo_id']])), '" alt="">';
+        echo '<div class="topo-tit"><strong>', e($titulo), '</strong>';
+        if ($varios) echo '<a class="topo-cond" href="', e(url('meus_condominios')), '">', e($nome), ' ▾</a>';
+        else echo '<small>', e($nome), '</small>';
+        echo '</div><button type="button" class="topo-btn" data-tema-alternar aria-label="Alternar tema claro e escuro">', icone('lua', 20), icone('sol', 20), '</button>';
+        echo '<a class="topo-user" href="', e(url('perfil')), '" aria-label="Meu perfil">', avatar($u, 40), '</a>';
         echo '</div></header>';
     }
     echo '<main class="conteudo', $u ? '' : ' sem-nav', '">';
@@ -311,6 +461,8 @@ function pagina_fim(): void {
         }
         echo '</div></nav>';
     }
-    echo '<script src="assets/app.js?v=2"></script></body></html>';
+    echo '<script src="assets/app.js?v=3"></script>';
+    foreach ($GLOBALS['scripts_extra'] ?? [] as $js) echo '<script src="assets/', e($js), '?v=3"></script>';
+    echo '</body></html>';
     echo emojis_para_icones((string)ob_get_clean());
 }

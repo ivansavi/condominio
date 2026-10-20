@@ -101,12 +101,12 @@ function enviar_email(string $para, string $assunto, string $texto, array $op = 
 
 function link_app(string $p = 'inicio', array $params = []): string { return rtrim((string)cfg('url_base'), '/') . '/' . url($p, $params); }
 
-/** E-mails dos condôminos ativos que aceitam receber mensagens (opcionalmente de uma unidade). */
+/** E-mails dos moradores com vínculo ativo que aceitam receber mensagens (de uma unidade ou do condomínio atual). */
 function emails_condominos(?int $unidade_id = null): array {
-    $sql = "SELECT nome, email FROM usuarios WHERE ativo = 1 AND receber_emails = 1 AND perfil = 'condomino' AND email <> ''";
-    $par = [];
-    if ($unidade_id) { $sql .= ' AND unidade_id = ?'; $par[] = $unidade_id; }
-    return linhas($sql, $par);
+    $sql = "SELECT DISTINCT u.nome, u.email FROM usuarios u JOIN unidade_vinculos v ON v.usuario_id = u.id JOIN unidades un ON un.id = v.unidade_id
+            WHERE u.ativo = 1 AND u.receber_emails = 1 AND u.email <> '' AND (v.data_fim IS NULL OR v.data_fim >= CURDATE())";
+    if ($unidade_id) return linhas($sql . ' AND un.id = ?', [$unidade_id]);
+    return linhas($sql . ' AND un.condominio_id = ?', [cid()]);
 }
 
 /** Envia a mesma mensagem a todos os condôminos. Retorna [enviados, falhas]. */

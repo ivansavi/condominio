@@ -2,17 +2,21 @@
 declare(strict_types=1);
 require __DIR__ . '/src/app.php';
 
-// página => [arquivo, acesso]  (acesso: publico | logado | admin | gestao)
+// página => [arquivo, acesso]
+// acesso: publico | logado | admin (qualquer nível no condomínio) | super (gestor principal) | nome de uma permissão (ver PERMISSOES em src/app.php)
 $rotas = [
     'login' => ['login', 'publico'], 'esqueci' => ['esqueci', 'publico'], 'redefinir' => ['redefinir', 'publico'], 'sair' => ['sair', 'publico'],
-    'inicio' => ['inicio', 'logado'], 'perfil' => ['perfil', 'logado'], 'senha' => ['senha', 'logado'],
+    'inicio' => ['inicio', 'logado'], 'perfil' => ['perfil', 'logado'], 'senha' => ['senha', 'logado'], 'foto' => ['foto', 'logado'], 'tema' => ['tema', 'logado'],
+    'meus_condominios' => ['meus_condominios', 'logado'],
     'boletos' => ['boletos', 'logado'], 'boleto' => ['boleto', 'logado'],
     'prestacoes' => ['prestacoes', 'logado'], 'prestacao' => ['prestacao', 'logado'],
     'avisos' => ['avisos', 'logado'], 'aviso' => ['aviso', 'logado'], 'arquivo' => ['arquivo', 'logado'], 'mais' => ['mais', 'admin'],
-    'usuarios' => ['usuarios', 'admin'], 'usuario' => ['usuario', 'admin'], 'unidades' => ['unidades', 'admin'], 'unidade' => ['unidade', 'admin'],
-    'aviso_form' => ['aviso_form', 'admin'], 'vinculo' => ['vinculo', 'admin'], 'historico' => ['historico', 'admin'], 'inadimplencia' => ['inadimplencia', 'admin'],
-    'cobrancas' => ['cobrancas', 'gestao'], 'cobranca_gerar' => ['cobranca_gerar', 'gestao'], 'cobranca' => ['cobranca', 'gestao'],
-    'contas_gestao' => ['contas_gestao', 'gestao'], 'email_config' => ['email_config', 'gestao'], 'config' => ['config', 'gestao'],
+    'usuarios' => ['usuarios', 'moradores'], 'usuario' => ['usuario', 'moradores'], 'unidades' => ['unidades', 'moradores'], 'unidade' => ['unidade', 'moradores'],
+    'vinculo' => ['vinculo', 'moradores'], 'historico' => ['historico', 'admin'],
+    'aviso_form' => ['aviso_form', 'comunicados'], 'inadimplencia' => ['inadimplencia', 'financeiro_ver'],
+    'cobrancas' => ['cobrancas', 'cobrancas'], 'cobranca_gerar' => ['cobranca_gerar', 'cobrancas'], 'cobranca' => ['cobranca', 'cobrancas'],
+    'contas_gestao' => ['contas_gestao', 'contas'], 'email_config' => ['email_config', 'emails'],
+    'config' => ['config', 'condominio'], 'niveis' => ['niveis', 'niveis'], 'nivel' => ['nivel', 'niveis'], 'condominios' => ['condominios', 'super'],
 ];
 
 $p = $_GET['p'] ?? (usuario() ? 'inicio' : 'login');
@@ -23,9 +27,14 @@ $GLOBALS['pagina_atual'] = $p;
 if ($acesso !== 'publico') {
     $u = usuario();
     if (!$u) redirect('login');
-    if ($u['trocar_senha'] && $p !== 'senha' && $p !== 'sair') { flash('Por segurança, crie uma senha nova para continuar.', 'aviso'); redirect('senha'); }
-    if ($acesso === 'admin' && !eh_admin()) { http_response_code(403); exit('Acesso negado.'); }
-    if ($acesso === 'gestao' && !eh_gestao()) { http_response_code(403); exit('Acesso restrito à gestão.'); }
+    if ($u['trocar_senha'] && !in_array($p, ['senha', 'sair'], true)) { flash('Por segurança, crie uma senha nova para continuar.', 'aviso'); redirect('senha'); }
+    $negado = match ($acesso) {
+        'logado' => false,
+        'admin' => !eh_admin(),
+        'super' => !$u['super_admin'],
+        default => !pode($acesso),
+    };
+    if ($negado) { http_response_code(403); exit('Acesso negado.'); }
 }
 csrf_exigir();
 require __DIR__ . '/src/pages/' . $arquivo . '.php';

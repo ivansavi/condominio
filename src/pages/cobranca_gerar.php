@@ -1,6 +1,6 @@
 <?php
 $comp = competencia_valida(get('c', post('competencia', date('Y-m')))) ?? date('Y-m-01');
-$unidades = linhas('SELECT * FROM unidades WHERE ativo = 1 ORDER BY bloco, CAST(numero AS UNSIGNED), numero');
+$unidades = linhas('SELECT * FROM unidades WHERE condominio_id = ? AND ativo = 1 ORDER BY bloco, CAST(numero AS UNSIGNED), numero', [cid()]);
 if (eh_post()) {
     $venc = post('vencimento'); $desc = post('descricao') ?: 'Taxa de condomínio';
     $uniforme = post('valor_unico') !== '' ? ler_dinheiro(post('valor_unico')) : null;

@@ -12,6 +12,7 @@ function regras_lembrete(): array {
 }
 
 function enviar_aviso_cobranca(array $c, string $tipo): int {
+    usar_condominio((int)valor('SELECT condominio_id FROM unidades WHERE id = ?', [$c['unidade_id']]));
     $at = cobranca_atualizada($c);
     $ref = mes_ano($c['competencia']);
     $linhas = [
@@ -27,12 +28,13 @@ function enviar_aviso_cobranca(array $c, string $tipo): int {
     return $enviados;
 }
 
-/** Envia os lembretes pendentes (uma vez por cobrança e tipo). Retorna contagens por tipo. */
-function processar_lembretes(): array {
+/** Envia os lembretes pendentes (uma vez por cobrança e tipo), de um condomínio ou de todos. Retorna contagens por tipo. */
+function processar_lembretes(?int $condominio = null): array {
     @set_time_limit(300);
     $res = [];
     foreach (regras_lembrete() as $tipo => [$filtro]) {
-        $cobs = linhas("SELECT c.* FROM cobrancas c WHERE c.status = 'aberto' AND $filtro AND NOT EXISTS (SELECT 1 FROM lembretes_enviados l WHERE l.cobranca_id = c.id AND l.tipo = ?)", [$tipo]);
+        $cobs = linhas("SELECT c.* FROM cobrancas c WHERE c.status = 'aberto' AND $filtro AND NOT EXISTS (SELECT 1 FROM lembretes_enviados l WHERE l.cobranca_id = c.id AND l.tipo = ?)"
+            . ($condominio ? ' AND c.unidade_id IN (SELECT id FROM unidades WHERE condominio_id = ' . (int)$condominio . ')' : ''), [$tipo]);
         $env = 0; $sem = 0;
         foreach ($cobs as $c) {
             if (!emails_condominos((int)$c['unidade_id'])) { $sem++; continue; }

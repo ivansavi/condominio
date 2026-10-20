@@ -1,10 +1,11 @@
 <?php
 $u = usuario();
-$c = linha('SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE c.id = ?', [(int)get('id')]);
-if (!$c || (!eh_admin() && (int)$c['unidade_id'] !== (int)$u['unidade_id'])) { http_response_code(404); pagina_inicio('Boleto'); echo '<div class="card">Boleto não encontrado.</div>'; pagina_fim(); return; }
+$c = linha('SELECT c.*, un.bloco, un.numero FROM cobrancas c JOIN unidades un ON un.id = c.unidade_id WHERE c.id = ? AND un.condominio_id = ?', [(int)get('id'), cid()]);
+$pode_ver = $c && (in_array((int)$c['unidade_id'], ids_unidades_do_usuario(), true) || pode('financeiro_ver') || pode('cobrancas') || pode('moradores'));
+if (!$pode_ver) { http_response_code(404); pagina_inicio('Boleto'); echo '<div class="card">Boleto não encontrado.</div>'; pagina_fim(); return; }
 $at = cobranca_atualizada($c); $sit = cobranca_situacao($c);
-$resp = linha("SELECT nome FROM usuarios WHERE unidade_id = ? AND ativo = 1 ORDER BY tipo_morador = 'proprietario' DESC, id LIMIT 1", [$c['unidade_id']]);
-pagina_inicio('Boleto', ['voltar' => url(eh_admin() ? 'cobrancas' : 'boletos')]);
+$resp = linha("SELECT nome FROM unidade_vinculos WHERE unidade_id = ? AND (data_fim IS NULL OR data_fim >= CURDATE()) ORDER BY tipo = 'proprietario' DESC, id LIMIT 1", [$c['unidade_id']]);
+pagina_inicio('Boleto', ['voltar' => url(pode('cobrancas') ? 'cobrancas' : 'boletos')]);
 ?>
 <article class="card boleto">
   <header>
@@ -47,6 +48,6 @@ pagina_inicio('Boleto', ['voltar' => url(eh_admin() ? 'cobrancas' : 'boletos')])
   <?php endif; ?>
   <?php if ($c['observacao']): ?><p class="muted pequeno"><?= e($c['observacao']) ?></p><?php endif; ?>
   <button class="btn btn-sec nao-imprimir" type="button" data-imprimir>🖨️ Imprimir</button>
-  <?php if (eh_gestao()): ?><a class="btn btn-sec nao-imprimir" href="<?= e(url('cobranca', ['id' => $c['id']])) ?>">✏️ Editar / dar baixa</a><?php endif; ?>
+  <?php if (pode('cobrancas')): ?><a class="btn btn-sec nao-imprimir" href="<?= e(url('cobranca', ['id' => $c['id']])) ?>">✏️ Editar / dar baixa</a><?php endif; ?>
 </article>
 <?php pagina_fim();
