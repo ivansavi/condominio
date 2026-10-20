@@ -24,6 +24,11 @@ Ative o SSL grátis no hPanel; o `.htaccess` força HTTPS e bloqueia `config.php
 
 O banco é criado e atualizado **sozinho**: a cada requisição o app aplica os arquivos novos de `database/migrations/*.sql` (controle na tabela `schema_versao`). Para alterar o banco no futuro basta adicionar `00N_descricao.sql` e fazer o deploy.
 
+## Cadastros, histórico e e-mails
+- **Moradores:** data da compra e da venda (ou início/fim da locação), ativar/desativar cadastro. Ao salvar uma alteração, o app mostra *como era → como ficou* e pergunta se quer registrar no histórico.
+- **Unidades:** histórico de proprietários e cadastro de locatários (Unidades → abrir a unidade). Moradores com situação e datas entram no histórico automaticamente.
+- **E-mails:** Mais → E-mails e lembretes. Informe o SMTP (Hostinger: `smtp.hostinger.com`, porta 465 SSL), teste o envio e ative os lembretes. Para o envio diário, crie um Cron Job no hPanel com o comando mostrado nessa tela.
+
 ## Fluxo mensal da Gestão
 1. *Cobranças → Gerar boletos do mês* (uma cobrança por unidade, usando a taxa de cada uma).
 2. Em cada cobrança, anexe o PDF do boleto emitido no banco e/ou a linha digitável / Pix copia e cola (ou configure uma chave Pix única).

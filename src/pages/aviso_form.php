@@ -11,9 +11,9 @@ if (eh_post()) {
         else {
             q('INSERT INTO comunicados (titulo, corpo, importante, autor_id) VALUES (?,?,?,?)', [$t, $c, $imp, $me['id']]);
             $novo = (int)db()->lastInsertId();
-            if (post('email')) { // envia por e-mail para todos os moradores ativos
-                $dest = linhas("SELECT email FROM usuarios WHERE ativo = 1 AND perfil = 'condomino'");
-                foreach ($dest as $d) enviar_email($d['email'], '[' . conf('condominio_nome', 'Condomínio') . '] ' . $t, $c . "\n\nVeja no app: " . rtrim((string)cfg('url_base'), '/') . '/');
+            if (post('email')) {
+                [$ok, $falha] = enviar_para_condominos($t, $c, ['tipo' => 'comunicado', 'botao' => ['Ver no aplicativo', link_app('aviso', ['id' => $novo])]]);
+                flash("$ok e-mail(s) enviado(s)" . ($falha ? ", $falha falha(s)" : '') . '.', $falha ? 'aviso' : 'ok');
             }
         }
         flash('Comunicado publicado!'); redirect('aviso', ['id' => $novo]);

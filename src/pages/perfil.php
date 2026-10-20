@@ -5,8 +5,8 @@ if (eh_post()) {
     if ($nome === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) flash('Informe seu nome e um e-mail válido.', 'erro');
     elseif (valor('SELECT id FROM usuarios WHERE email = ? AND id <> ?', [$email, $u['id']])) flash('Este e-mail já está em uso por outro usuário.', 'erro');
     else {
-        q('UPDATE usuarios SET nome=?, email=?, telefone=?, whatsapp=?, contato_emergencia=? WHERE id=?',
-            [$nome, $email, post('telefone') ?: null, post('whatsapp') ?: null, post('contato_emergencia') ?: null, $u['id']]);
+        q('UPDATE usuarios SET nome=?, email=?, telefone=?, whatsapp=?, contato_emergencia=?, receber_emails=? WHERE id=?',
+            [$nome, $email, post('telefone') ?: null, post('whatsapp') ?: null, post('contato_emergencia') ?: null, post('receber_emails') ? 1 : 0, $u['id']]);
         flash('Dados atualizados!');
         redirect('perfil');
     }
@@ -25,6 +25,7 @@ pagina_inicio('Meu perfil');
   <label>Telefone<input type="tel" name="telefone" value="<?= e($u['telefone']) ?>" inputmode="tel" placeholder="(11) 3333-4444"></label>
   <label>WhatsApp<input type="tel" name="whatsapp" value="<?= e($u['whatsapp']) ?>" inputmode="tel" placeholder="(11) 99999-8888"></label>
   <label>Contato de emergência<input name="contato_emergencia" value="<?= e($u['contato_emergencia']) ?>" placeholder="Nome e telefone"></label>
+  <label class="check"><input type="checkbox" name="receber_emails" value="1" <?= $u['receber_emails'] ? 'checked' : '' ?>> Receber avisos, lembretes e boletos por e-mail</label>
   <button class="btn btn-grande">Salvar</button>
 </form>
 <a class="card item" href="<?= e(url('senha')) ?>"><span>🔒 Alterar minha senha</span><span class="seta">›</span></a>

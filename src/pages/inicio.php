@@ -41,11 +41,11 @@ else:
     </section>
     <h3 class="sec">Ações rápidas</h3>
     <div class="atalhos">
-      <a href="<?= e(url('usuario')) ?>" class="atalho">➕ Cadastrar morador</a>
-      <a href="<?= e(url('aviso_form')) ?>" class="atalho">📣 Novo comunicado</a>
+      <a href="<?= e(url('usuario')) ?>" class="atalho"><span class="chip"><?= icone('plus', 22) ?></span>Cadastrar morador</a>
+      <a href="<?= e(url('aviso_form')) ?>" class="atalho"><span class="chip"><?= icone('megafone', 22) ?></span>Novo comunicado</a>
       <?php if (eh_gestao()): ?>
-        <a href="<?= e(url('cobranca_gerar')) ?>" class="atalho">🧾 Gerar boletos do mês</a>
-        <a href="<?= e(url('contas_gestao')) ?>" class="atalho">📊 Prestação de contas</a>
+        <a href="<?= e(url('cobranca_gerar')) ?>" class="atalho"><span class="chip"><?= icone('boleto', 22) ?></span>Gerar boletos do mês</a>
+        <a href="<?= e(url('contas_gestao')) ?>" class="atalho"><span class="chip"><?= icone('contas', 22) ?></span>Prestação de contas</a>
       <?php endif; ?>
     </div>
 <?php endif;

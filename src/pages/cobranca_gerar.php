@@ -6,15 +6,17 @@ if (eh_post()) {
     $uniforme = post('valor_unico') !== '' ? ler_dinheiro(post('valor_unico')) : null;
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $venc)) flash('Informe a data de vencimento.', 'erro');
     else {
-        $n = 0; $ja = 0; $sem = 0;
+        $n = 0; $ja = 0; $sem = 0; $avisados = 0; $novas = [];
         foreach ($unidades as $un) {
             $v = $uniforme ?? (float)$un['valor_condominio'];
             if ($v <= 0) { $sem++; continue; }
             if (valor("SELECT id FROM cobrancas WHERE unidade_id = ? AND competencia = ? AND descricao = ? AND status <> 'cancelado'", [$un['id'], $comp, $desc])) { $ja++; continue; }
             q('INSERT INTO cobrancas (unidade_id, competencia, descricao, valor, vencimento, pix_copia_cola) VALUES (?,?,?,?,?,NULL)', [$un['id'], $comp, $desc, $v, $venc]);
+            $novas[] = (int)db()->lastInsertId();
             $n++;
         }
-        flash("$n boleto(s) gerado(s)." . ($ja ? " $ja já existia(m)." : '') . ($sem ? " $sem unidade(s) sem valor definido foram ignoradas." : ''));
+        if (post('avisar_email')) foreach ($novas as $cid) $avisados += enviar_aviso_cobranca(linha('SELECT * FROM cobrancas WHERE id = ?', [$cid]), 'novo');
+        flash("$n boleto(s) gerado(s)." . ($ja ? " $ja já existia(m)." : '') . ($sem ? " $sem unidade(s) sem valor definido foram ignoradas." : '') . ($avisados ? " $avisados e-mail(s) enviado(s)." : ''));
         redirect('cobrancas', ['c' => substr($comp, 0, 7)]);
     }
 }
@@ -27,6 +29,7 @@ pagina_inicio('Gerar boletos do mês', ['voltar' => url('cobrancas')]);
   <label>Vencimento<input type="date" name="vencimento" value="<?= e(date('Y-m-', strtotime($comp)) . str_pad((string)$dia, 2, '0', STR_PAD_LEFT)) ?>" required></label>
   <label>Descrição<input name="descricao" value="Taxa de condomínio"></label>
   <label>Valor único para todas (opcional)<input name="valor_unico" inputmode="decimal" placeholder="Deixe vazio para usar o valor de cada unidade"></label>
+  <label class="check"><input type="checkbox" name="avisar_email" value="1"> Avisar os moradores por e-mail</label>
   <p class="muted pequeno"><?= count($unidades) ?> unidade(s) ativa(s). Depois de gerar, abra cada cobrança para anexar o PDF do boleto do banco, linha digitável ou Pix.</p>
   <button class="btn btn-grande">Gerar boletos</button>
 </form>

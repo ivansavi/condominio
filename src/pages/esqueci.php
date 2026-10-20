@@ -8,7 +8,7 @@ if (eh_post()) {
         $token = bin2hex(random_bytes(32));
         q('INSERT INTO reset_senha (usuario_id, token_hash, expira_em) VALUES (?, ?, NOW() + INTERVAL 1 HOUR)', [$u['id'], hash('sha256', $token)]);
         $link = rtrim((string)cfg('url_base'), '/') . '/' . url('redefinir', ['t' => $token]);
-        enviar_email($email, 'Recuperação de senha', "Olá, {$u['nome']}!\n\nPara criar uma nova senha, acesse o link abaixo (vale por 1 hora):\n\n$link\n\nSe você não pediu isso, ignore esta mensagem.");
+        enviar_email($email, 'Recuperação de senha', "Olá, {$u['nome']}!\n\nRecebemos um pedido para criar uma nova senha. O link vale por 1 hora.\n\nSe você não pediu isso, ignore esta mensagem.", ['tipo' => 'senha', 'botao' => ['Criar nova senha', $link]]);
     }
     $enviado = true; // resposta igual exista ou não o e-mail (evita descobrir quem é morador)
 }

@@ -26,4 +26,11 @@
     var atualiza = function () { chk.style.display = sel.value === 'sindico' ? '' : 'none'; };
     sel.addEventListener('change', atualiza); atualiza();
   }
+  // Rótulos das datas conforme a situação (proprietário compra/vende; inquilino começa/termina a locação)
+  var tipo = document.querySelector('[data-tipo-morador]');
+  if (tipo) {
+    var ini = document.querySelector('[data-rot-inicio]'), fim = document.querySelector('[data-rot-fim]');
+    var rot = function () { var loc = tipo.value === 'inquilino'; ini.textContent = loc ? 'Início da locação' : 'Data da compra'; fim.textContent = loc ? 'Fim da locação' : 'Data da venda'; };
+    tipo.addEventListener('change', rot); rot();
+  }
 })();

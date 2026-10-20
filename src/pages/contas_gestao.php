@@ -18,6 +18,7 @@ if (eh_post()) {
             q('UPDATE prestacoes SET observacao = ? WHERE competencia = ?', [post('observacao') ?: null, $comp]); flash('Mensagem salva.');
         } elseif ($acao === 'publicar') {
             q('UPDATE prestacoes SET publicada = 1, publicada_em = NOW() WHERE competencia = ?', [$comp]); flash('Prestação publicada para os condôminos!');
+            if (post('avisar_email')) { [$ok, $falha] = enviar_para_condominos('Prestação de contas de ' . mes_ano($comp), 'A prestação de contas de ' . mes_ano($comp) . " já está disponível no aplicativo.", ['tipo' => 'prestacao', 'botao' => ['Ver prestação de contas', link_app('prestacao', ['c' => $ym])]]); flash("$ok e-mail(s) enviado(s)" . ($falha ? ", $falha falha(s)" : '') . '.'); }
         } elseif ($acao === 'despublicar') {
             q('UPDATE prestacoes SET publicada = 0 WHERE competencia = ?', [$comp]); flash('Prestação ocultada.');
         } elseif ($acao === 'anexar') {
@@ -90,6 +91,7 @@ if (!$r['lancamentos']) echo '<div class="card vazio">Nenhum lançamento neste m
     <p class="alerta alerta-ok">✅ Publicada em <?= data_br($pr['publicada_em']) ?></p>
     <input type="hidden" name="acao" value="despublicar"><button class="btn btn-sec">Ocultar dos condôminos</button>
   <?php else: ?>
+    <label class="check"><input type="checkbox" name="avisar_email" value="1"> Avisar os condôminos por e-mail</label>
     <input type="hidden" name="acao" value="publicar"><button class="btn btn-grande">📢 Publicar para os condôminos</button>
   <?php endif; ?>
 </form>

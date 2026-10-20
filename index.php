@@ -10,9 +10,9 @@ $rotas = [
     'prestacoes' => ['prestacoes', 'logado'], 'prestacao' => ['prestacao', 'logado'],
     'avisos' => ['avisos', 'logado'], 'aviso' => ['aviso', 'logado'], 'arquivo' => ['arquivo', 'logado'], 'mais' => ['mais', 'admin'],
     'usuarios' => ['usuarios', 'admin'], 'usuario' => ['usuario', 'admin'], 'unidades' => ['unidades', 'admin'], 'unidade' => ['unidade', 'admin'],
-    'aviso_form' => ['aviso_form', 'admin'], 'inadimplencia' => ['inadimplencia', 'admin'],
+    'aviso_form' => ['aviso_form', 'admin'], 'vinculo' => ['vinculo', 'admin'], 'historico' => ['historico', 'admin'], 'inadimplencia' => ['inadimplencia', 'admin'],
     'cobrancas' => ['cobrancas', 'gestao'], 'cobranca_gerar' => ['cobranca_gerar', 'gestao'], 'cobranca' => ['cobranca', 'gestao'],
-    'contas_gestao' => ['contas_gestao', 'gestao'], 'config' => ['config', 'gestao'],
+    'contas_gestao' => ['contas_gestao', 'gestao'], 'email_config' => ['email_config', 'gestao'], 'config' => ['config', 'gestao'],
 ];
 
 $p = $_GET['p'] ?? (usuario() ? 'inicio' : 'login');

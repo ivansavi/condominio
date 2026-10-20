@@ -216,13 +216,9 @@ function salvar_upload(string $campo): ?int {
     return (int)db()->lastInsertId();
 }
 
-/* ---------- E-mail ---------- */
-function enviar_email(string $para, string $assunto, string $texto): bool {
-    $de = cfg('email_remetente', 'nao-responder@localhost');
-    $nome = conf('condominio_nome', 'Condomínio');
-    $h = "From: =?UTF-8?B?" . base64_encode($nome) . "?= <$de>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=UTF-8\r\n";
-    return @mail($para, '=?UTF-8?B?' . base64_encode($assunto) . '?=', $texto, $h);
-}
+require __DIR__ . '/historico.php';
+require __DIR__ . '/email.php';
+require __DIR__ . '/lembretes.php';
 
 /* ---------- Layout ---------- */
 function avisos_nao_lidos(): int {
@@ -230,17 +226,46 @@ function avisos_nao_lidos(): int {
     return (int)valor('SELECT COUNT(*) FROM comunicados c WHERE c.ativo = 1 AND NOT EXISTS (SELECT 1 FROM comunicado_leituras l WHERE l.comunicado_id = c.id AND l.usuario_id = ?)', [$u['id']]);
 }
 
-function icone(string $n): string {
-    $p = [
-        'inicio' => 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
-        'boleto' => 'M4 4h16v16H4zM8 8h8M8 12h8M8 16h5',
-        'contas' => 'M4 20V10M10 20V4M16 20v-7M22 20H2',
-        'avisos' => 'M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10 20a2 2 0 0 0 4 0',
-        'perfil' => 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0',
-        'moradores' => 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M17 3.5a4 4 0 0 1 0 7M22 21a7 7 0 0 0-4-6',
-        'mais' => 'M5 12h.01M12 12h.01M19 12h.01',
-    ];
-    return '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' . ($p[$n] ?? '') . '"/></svg>';
+const ICONES = [
+    'inicio' => 'M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
+    'boleto' => 'M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2zM9 8h6M9 12h6',
+    'contas' => 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+    'avisos' => 'M18 8a6 6 0 0 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10 20a2 2 0 0 0 4 0',
+    'perfil' => 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 21a8 8 0 0 1 16 0',
+    'moradores' => 'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8M2 21a7 7 0 0 1 14 0M17 3.5a4 4 0 0 1 0 7M22 21a7 7 0 0 0-4-6',
+    'mais' => 'M4 7h16M4 12h16M4 17h16',
+    'plus' => 'M12 5v14M5 12h14',
+    'megafone' => 'M3 11v2a1 1 0 0 0 1 1h3l8 4V6L7 10H4a1 1 0 0 0-1 1zM19 9a4 4 0 0 1 0 6',
+    'alerta' => 'M12 3l10 18H2zM12 10v5M12 18h.01',
+    'predio' => 'M4 21V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v17M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3',
+    'config' => 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+    'sair' => 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+    'cadeado' => 'M5 11h14v10H5zM8 11V7a4 4 0 0 1 8 0v4',
+    'chave' => 'M21 2l-2 2m-7.6 7.6a5.5 5.5 0 1 1-7.8 7.8 5.5 5.5 0 0 1 7.8-7.8zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4',
+    'arquivo' => 'M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 13h6M9 17h6',
+    'clipe' => 'M21 11l-9 9a5 5 0 0 1-7-7l9-9a3.5 3.5 0 0 1 5 5l-9 9a2 2 0 0 1-3-3l8-8',
+    'impressora' => 'M6 9V3h12v6M6 18H4a1 1 0 0 1-1-1v-6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a1 1 0 0 1-1 1h-2M6 14h12v7H6z',
+    'editar' => 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+    'olho' => 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6',
+    'carteira' => 'M3 7a2 2 0 0 1 2-2h14v4M3 7v11a2 2 0 0 0 2 2h16V9H5a2 2 0 0 1-2-2zM17 14h.01',
+    'relogio' => 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18M12 7v5l3 2',
+    'check' => 'M20 6L9 17l-5-5',
+    'desfazer' => 'M3 7v6h6M3 13a9 9 0 1 0 3-7',
+    'email' => 'M3 5h18v14H3zM3 7l9 7 9-7',
+];
+
+/** Ícone de linha (SVG inline). $tam em pixels. */
+function icone(string $n, int $tam = 24): string {
+    return '<svg class="i" viewBox="0 0 24 24" width="' . $tam . '" height="' . $tam . '" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' . (ICONES[$n] ?? '') . '"/></svg>';
+}
+
+/** Troca os emojis usados nas telas por ícones de linha (visual uniforme em qualquer aparelho). */
+function emojis_para_icones(string $html): string {
+    static $mapa = ['👋' => '', '🎉' => '', '✅' => 'check', '➕' => 'plus', '📣' => 'megafone', '📢' => 'megafone', '🧾' => 'boleto', '📊' => 'contas', '📄' => 'arquivo', '🖨' => 'impressora',
+        '✏' => 'editar', '👁' => 'olho', '💰' => 'carteira', '🔑' => 'chave', '📎' => 'clipe', '🏢' => 'predio', '👥' => 'moradores', '⚙' => 'config', '🙂' => 'perfil',
+        '🚪' => 'sair', '🔒' => 'cadeado', '⚠' => 'alerta', '↩' => 'desfazer', '🕘' => 'relogio'];
+    return preg_replace_callback('/(' . implode('|', array_map('preg_quote', array_keys($mapa))) . ')\x{FE0F}?\s?/u',
+        fn($m) => $mapa[$m[1]] === '' ? '' : icone($mapa[$m[1]], 18) . ' ', $html);
 }
 
 function menu_principal(): array {
@@ -250,13 +275,16 @@ function menu_principal(): array {
 }
 
 function pagina_inicio(string $titulo, array $o = []): void {
+    ob_start();
     $u = usuario(); $atual = $GLOBALS['pagina_atual'] ?? '';
     $nome = conf('condominio_nome', 'Condomínio');
     echo '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">',
         '<meta name="theme-color" content="#0f766e"><link rel="manifest" href="assets/manifest.webmanifest">',
+        '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+        '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">',
         '<link rel="icon" href="assets/icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="assets/icon.svg">',
-        '<title>', e($titulo), ' · ', e($nome), '</title><link rel="stylesheet" href="assets/app.css?v=1"></head><body>';
+        '<title>', e($titulo), ' · ', e($nome), '</title><link rel="stylesheet" href="assets/app.css?v=2"></head><body>';
     if ($u) {
         echo '<header class="topo"><div class="topo-in">';
         if (!empty($o['voltar'])) echo '<a class="voltar" href="', e($o['voltar']), '" aria-label="Voltar">‹</a>';
@@ -274,14 +302,15 @@ function pagina_fim(): void {
     echo '</main>';
     if ($u) {
         $nao_lidos = avisos_nao_lidos();
-        echo '<nav class="nav" aria-label="Menu principal">';
+        echo '<nav class="nav" aria-label="Menu principal"><div class="nav-in">';
         foreach (menu_principal() as [$p, $rot, $ic]) {
             $ativo = $p === $atual ? ' ativo' : '';
             echo '<a class="nav-item', $ativo, '" href="', e(url($p)), '">', icone($ic);
             if ($p === 'avisos' && $nao_lidos) echo '<span class="badge">', $nao_lidos, '</span>';
             echo '<span>', e($rot), '</span></a>';
         }
-        echo '</nav>';
+        echo '</div></nav>';
     }
-    echo '<script src="assets/app.js?v=1"></script></body></html>';
+    echo '<script src="assets/app.js?v=2"></script></body></html>';
+    echo emojis_para_icones((string)ob_get_clean());
 }
