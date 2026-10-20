@@ -20,12 +20,18 @@ jobs:
           EMAIL_REMETENTE: ${{ secrets.EMAIL_REMETENTE }}
         run: |
           php -r '$c = ["db_host" => getenv("DB_HOST") ?: "localhost", "db_nome" => getenv("DB_NAME"), "db_user" => getenv("DB_USER"), "db_pass" => getenv("DB_PASS"), "url_base" => getenv("URL_BASE"), "email_remetente" => getenv("EMAIL_REMETENTE") ?: "nao-responder@localhost", "debug" => false]; file_put_contents("config.php", "<?php\nreturn " . var_export($c, true) . ";\n");'
+      - name: Normalizar pasta do FTP (sempre termina com /)
+        env:
+          FTP_DIR: ${{ secrets.FTP_DIR }}
+        run: |
+          d="${FTP_DIR:-/}"; d="${d%/}/"
+          echo "FTP_DIR_NORM=$d" >> "$GITHUB_ENV"
       - uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USER }}
           password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_DIR }}/
+          server-dir: ${{ env.FTP_DIR_NORM }}
           exclude: |
             **/.git*
             **/.git*/**
