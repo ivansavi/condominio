@@ -1,0 +1,13 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Força HTTPS
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Bloqueia arquivos sensíveis
+<FilesMatch "^(config\.php|config\.sample\.php|.*\.sql|.*\.md)$">
+  Require all denied
+</FilesMatch>
